@@ -42,9 +42,6 @@ export function UserMenu({ user, onSignIn, onLogout }: UserMenuProps) {
           <User className="w-5 h-5 md:w-6 md:h-6 opacity-40 group-hover:opacity-100 transition-opacity" />
         )}
         
-        {/* {user && (
-          <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-        )} */}
       </button>
 
       <AnimatePresence>
