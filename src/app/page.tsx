@@ -34,6 +34,7 @@ export default function Dashboard() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user, signInWithGoogle, logout, loading: authLoading } = useAuth();
 
   // Firestore Synchronization
@@ -63,9 +64,11 @@ export default function Dashboard() {
         console.log("Firestore sync update. Missions found:", habitsData.length);
         setHabits(habitsData);
         setIsLoading(false);
+        setError(null);
       },
-      (error) => {
-        console.error("Firestore subscription error:", error);
+      (err) => {
+        console.error("Firestore subscription error:", err);
+        setError("Failed to sync with cloud. Check your connection or security rules.");
         setIsLoading(false);
       }
     );
@@ -74,7 +77,7 @@ export default function Dashboard() {
   }, [user, authLoading]);
 
   const successRate = useMemo(() => {
-    if (habits.length === 0) return 0;
+    if (!habits || habits.length === 0) return 0;
     const completed = habits.filter(h => h.isCompletedToday).length;
     return Math.round((completed / habits.length) * 100);
   }, [habits]);
@@ -142,6 +145,14 @@ export default function Dashboard() {
         onSignIn={signInWithGoogle}
         onLogout={logout}
       />
+
+      {/* Error State */}
+      {error && (
+        <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-500 text-xs font-bold uppercase tracking-tight">
+          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         <div className="lg:col-span-2 flex flex-col gap-6">

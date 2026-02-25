@@ -28,11 +28,15 @@ if (canInitialize) {
   auth = getAuth(app);
   
   // Initialize Firestore with local persistence
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    })
-  });
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    });
+  } catch (error) {
+    db = getFirestore(app);
+  }
 } else {
   // Mock implementations for SSR/Build time
   app = {} as any;
