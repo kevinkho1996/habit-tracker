@@ -79,9 +79,10 @@ export function TaskList({ habits, onToggle, onDelete }: TaskListProps) {
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 0.3 }}
-          className="flex flex-col items-center justify-center py-24 glass-card rounded-[2.5rem] border-dashed border-2 border-foreground/10"
+          className="flex flex-col items-center justify-center py-24 glass-card rounded-[2.5rem] border-dashed border-2 border-foreground/10 px-8 text-center"
         >
-          <p className="font-display font-black uppercase tracking-[0.3em] text-[10px]">Strategic Void</p>
+          <p className="font-display font-black uppercase tracking-[0.3em] text-[10px] mb-2">No active missions for this account</p>
+          <p className="text-[9px] opacity-60">Verified {new Date().toLocaleTimeString()}</p>
         </motion.div>
       )}
     </div>

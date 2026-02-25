@@ -3,8 +3,7 @@ import { getAuth } from "firebase/auth";
 import { 
   getFirestore, 
   initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager 
+  persistentLocalCache 
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -27,12 +26,10 @@ if (canInitialize) {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
   
-  // Initialize Firestore with local persistence
+  // Initialize Firestore with local persistence (Simplified for Mobile Stability)
   try {
     db = initializeFirestore(app, {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-      })
+      localCache: persistentLocalCache({})
     });
   } catch (error) {
     db = getFirestore(app);

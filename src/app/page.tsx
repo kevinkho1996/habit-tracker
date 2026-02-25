@@ -62,6 +62,9 @@ export default function Dashboard() {
           ...doc.data()
         })) as Habit[];
         console.log("Firestore sync update. Missions found:", habitsData.length);
+        if (habitsData.length === 0 && user) {
+          console.log("Verification: Collection users/" + user.uid + "/habits is empty.");
+        }
         setHabits(habitsData);
         setIsLoading(false);
         setError(null);
@@ -145,6 +148,24 @@ export default function Dashboard() {
         onSignIn={signInWithGoogle}
         onLogout={logout}
       />
+
+      {/* Account Verification Debug */}
+      {user && (
+        <div className="flex flex-col md:flex-row justify-between items-center gap-2 mb-6 -mt-8 px-2 transition-all duration-300">
+          <div className="flex items-center gap-2 text-[9px] font-bold opacity-30 uppercase tracking-[0.2em] w-full md:w-auto">
+            <span className="w-1.5 h-1.5 rounded-full bg-brand-primary" />
+            Active Account: {user.email}
+          </div>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${
+            isLoading 
+              ? "bg-amber-500/10 text-amber-500 border-amber-500/20" 
+              : "bg-green-500/10 text-green-500 border-green-500/20"
+          }`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${isLoading ? "bg-amber-500 animate-pulse" : "bg-green-500"}`} />
+            {isLoading ? "Syncing Logic..." : "Cloud Link Secured"}
+          </div>
+        </div>
+      )}
 
       {/* Error State */}
       {error && (
