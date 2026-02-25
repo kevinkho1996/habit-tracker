@@ -51,7 +51,7 @@ export default function Dashboard() {
 
     const q = query(
       collection(db, `users/${user.uid}/habits`),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "asc")
     );
 
     const unsubscribe = onSnapshot(q, 
@@ -114,7 +114,7 @@ export default function Dashboard() {
         name: newHabit.name,
         isCompletedToday: false,
       };
-      setHabits(prev => [habit, ...prev]);
+      setHabits(prev => [...prev, habit]);
     }
   };
 
