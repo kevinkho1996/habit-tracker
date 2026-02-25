@@ -1,65 +1,197 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useState, useMemo, useEffect } from "react";
+import { Header } from "@/components/dashboard/header";
+import { InsightCards } from "@/components/dashboard/insight-cards";
+import { TaskList } from "@/components/dashboard/task-list";
+import { DisciplineChart } from "@/components/discipline-chart";
+import { AddHabitModal } from "@/components/add-habit-modal";
+import { useAuth } from "@/components/providers/auth-provider";
+import { db } from "@/lib/firebase";
+import { 
+  collection, 
+  onSnapshot, 
+  query, 
+  addDoc, 
+  deleteDoc, 
+  updateDoc, 
+  doc, 
+  serverTimestamp,
+  orderBy
+} from "firebase/firestore";
+
+interface Habit {
+  id: string;
+  name: string;
+  isCompletedToday: boolean;
+}
+
+// History would normally come from a database, using empty/mock for now
+const MOCK_HISTORY: number[] = [];
+const MOCK_LABELS: string[] = [];
+
+export default function Dashboard() {
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user, signInWithGoogle, logout, loading: authLoading } = useAuth();
+
+  // Firestore Synchronization
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      setHabits([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    console.log("Initializing Firestore sync for user:", user.uid);
+
+    const q = query(
+      collection(db, `users/${user.uid}/habits`),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        const habitsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Habit[];
+        console.log("Firestore sync update. Missions found:", habitsData.length);
+        setHabits(habitsData);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error("Firestore subscription error:", error);
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user, authLoading]);
+
+  const successRate = useMemo(() => {
+    if (habits.length === 0) return 0;
+    const completed = habits.filter(h => h.isCompletedToday).length;
+    return Math.round((completed / habits.length) * 100);
+  }, [habits]);
+
+  const toggleHabit = async (id: string) => {
+    const habit = habits.find(h => h.id === id);
+    if (!habit) return;
+
+    if (user) {
+      try {
+        const habitRef = doc(db, `users/${user.uid}/habits`, id);
+        await updateDoc(habitRef, {
+          isCompletedToday: !habit.isCompletedToday
+        });
+      } catch (error) {
+        console.error("Error toggling habit:", error);
+      }
+    } else {
+      setHabits(prev => prev.map(h => h.id === id ? { ...h, isCompletedToday: !h.isCompletedToday } : h));
+    }
+  };
+
+  const addHabit = async (newHabit: { name: string }) => {
+    if (user) {
+      try {
+        await addDoc(collection(db, `users/${user.uid}/habits`), {
+          name: newHabit.name,
+          isCompletedToday: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch (error) {
+        console.error("Error adding habit:", error);
+      }
+    } else {
+      const habit: Habit = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: newHabit.name,
+        isCompletedToday: false,
+      };
+      setHabits(prev => [habit, ...prev]);
+    }
+  };
+
+  const deleteHabit = async (id: string) => {
+    if (user) {
+      try {
+        await deleteDoc(doc(db, `users/${user.uid}/habits`, id));
+      } catch (error) {
+        console.error("Error deleting habit:", error);
+      }
+    } else {
+      setHabits(prev => prev.filter(h => h.id !== id));
+    }
+  };
+
+  const chartData = [...MOCK_HISTORY, successRate];
+  const chartLabels = [...MOCK_LABELS, "Today"];
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto pb-24">
+      <Header 
+        date={new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        onAddClick={() => setIsModalOpen(true)}
+        user={user}
+        onSignIn={signInWithGoogle}
+        onLogout={logout}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className="lg:col-span-2 flex flex-col gap-6">
+          <section className="glass-card p-5 md:p-8 rounded-3xl">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="font-display text-lg md:text-xl font-bold uppercase tracking-tight">Performance</h2>
+                <p className="text-[10px] md:text-sm opacity-50">Daily Success Rate (%)</p>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl md:text-4xl font-black text-brand-primary">{successRate}%</span>
+                <p className="text-[9px] font-bold opacity-40 uppercase tracking-widest mt-1">Today</p>
+              </div>
+            </div>
+            <div className="h-[220px] md:h-[300px]">
+              <DisciplineChart data={chartData} labels={chartLabels} />
+            </div>
+          </section>
+
+          <InsightCards 
+            activeCount={habits.length}
+            perfectCount={chartData.filter(v => v === 100).length}
+          />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        <div className="lg:col-span-1">
+          {isLoading ? (
+            <div className="flex flex-col gap-6">
+              <div className="h-8 w-40 bg-foreground/5 rounded-lg animate-pulse" />
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-20 w-full glass-card opacity-50 animate-pulse rounded-2xl" />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <TaskList 
+              habits={habits}
+              onToggle={toggleHabit}
+              onDelete={deleteHabit}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          )}
         </div>
-      </main>
-    </div>
+      </div>
+
+      <AddHabitModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onAdd={addHabit}
+      />
+    </main>
   );
 }
