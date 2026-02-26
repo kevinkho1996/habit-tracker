@@ -7,7 +7,7 @@ import { TaskList } from "@/components/dashboard/task-list";
 import { DisciplineChart } from "@/components/discipline-chart";
 import { AddHabitModal } from "@/components/add-habit-modal";
 import { useAuth } from "@/components/providers/auth-provider";
-import { db } from "@/lib/firebase";
+import { db, trackEvent } from "@/lib/firebase";
 import { 
   collection, 
   onSnapshot, 
@@ -40,6 +40,11 @@ export default function Dashboard() {
 
   // Firestore Synchronization
   const [isFromCache, setIsFromCache] = useState(false);
+
+  // Track page view
+  useEffect(() => {
+    trackEvent('page_view', { page_title: 'Dashboard' });
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -116,6 +121,7 @@ export default function Dashboard() {
         await updateDoc(habitRef, {
           lastCompletedDate: habit.isCompletedToday ? null : today
         });
+        trackEvent(habit.isCompletedToday ? 'uncomplete_habit' : 'complete_habit', { habit_id: id });
       } catch (error) {
         console.error("Error toggling habit:", error);
       }
@@ -136,6 +142,7 @@ export default function Dashboard() {
           lastCompletedDate: null,
           createdAt: serverTimestamp(),
         });
+        trackEvent('add_habit', { habit_name: newHabit.name });
       } catch (error) {
         console.error("Error adding habit:", error);
       }
@@ -154,6 +161,7 @@ export default function Dashboard() {
     if (user) {
       try {
         await deleteDoc(doc(db, `users/${user.uid}/habits`, id));
+        trackEvent('delete_habit', { habit_id: id });
       } catch (error) {
         console.error("Error deleting habit:", error);
       }
@@ -169,7 +177,10 @@ export default function Dashboard() {
     <main className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto pb-24">
       <Header 
         date={new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        onAddClick={() => setIsModalOpen(true)}
+        onAddClick={() => {
+          trackEvent('click_add_objective_button');
+          setIsModalOpen(true);
+        }}
         user={user}
         onSignIn={signInWithGoogle}
         onLogout={logout}
@@ -182,7 +193,7 @@ export default function Dashboard() {
             <span className="w-1.5 h-1.5 rounded-full bg-brand-primary" />
             Account: {user.email}
           </div>
-          <div className="flex items-center gap-3 w-full md:w-auto justify-start">
+          {/* <div className="flex items-center gap-3 w-full md:w-auto justify-start">
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest border transition-colors ${
               isLoading 
                 ? "bg-amber-500/10 text-amber-500 border-amber-500/20" 
@@ -208,7 +219,7 @@ export default function Dashboard() {
                 Retry Link
               </button>
             )}
-          </div>
+          </div> */}
         </div>
       )}
 
