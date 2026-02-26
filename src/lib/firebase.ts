@@ -3,7 +3,8 @@ import { getAuth } from "firebase/auth";
 import { 
   getFirestore, 
   initializeFirestore, 
-  persistentLocalCache 
+  persistentLocalCache,
+  persistentMultipleTabManager
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -26,12 +27,17 @@ if (canInitialize) {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
   
-  // Initialize Firestore with local persistence (Simplified for Mobile Stability)
+  // Restore robust Firestore initialization with persistence
   try {
     db = initializeFirestore(app, {
-      localCache: persistentLocalCache({})
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(), // Supports multiple tabs
+      }),
+      experimentalForceLongPolling: true,
     });
+    console.log("Firestore initialized with Multi-Tab Persistence.");
   } catch (error) {
+    console.warn("Firestore init failed, falling back:", error);
     db = getFirestore(app);
   }
 } else {

@@ -24,6 +24,7 @@ interface Habit {
   id: string;
   name: string;
   isCompletedToday: boolean;
+  lastCompletedDate: string | null;
 }
 
 // History would normally come from a database, using empty/mock for now
@@ -38,6 +39,8 @@ export default function Dashboard() {
   const { user, signInWithGoogle, logout, loading: authLoading } = useAuth();
 
   // Firestore Synchronization
+  const [isFromCache, setIsFromCache] = useState(false);
+
   useEffect(() => {
     if (authLoading) return;
 
@@ -57,21 +60,36 @@ export default function Dashboard() {
 
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
-        const habitsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Habit[];
-        console.log("Firestore sync update. Missions found:", habitsData.length);
-        if (habitsData.length === 0 && user) {
-          console.log("Verification: Collection users/" + user.uid + "/habits is empty.");
-        }
+        const today = new Date().toISOString().split('T')[0];
+        const habitsData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name,
+            lastCompletedDate: data.lastCompletedDate,
+            isCompletedToday: data.lastCompletedDate === today
+          };
+        }) as Habit[];
+
         setHabits(habitsData);
+        setIsFromCache(snapshot.metadata.fromCache);
         setIsLoading(false);
         setError(null);
       },
       (err) => {
-        console.error("Firestore subscription error:", err);
-        setError("Failed to sync with cloud. Check your connection or security rules.");
+        console.error("❌ [Firestore Error]", {
+          code: err.code,
+          message: err.message,
+          cause: err.name
+        });
+        
+        if (err.code === 'permission-denied') {
+          setError("Access Denied. Check your Firestore Security Rules or if the API is enabled.");
+        } else if (err.code === 'unavailable') {
+          setError("Cloud Connection Failed. The Firestore API might be disabled for this project.");
+        } else {
+          setError(`Sync Error: ${err.message}`);
+        }
         setIsLoading(false);
       }
     );
@@ -89,17 +107,24 @@ export default function Dashboard() {
     const habit = habits.find(h => h.id === id);
     if (!habit) return;
 
+    const today = new Date().toISOString().split('T')[0];
+
     if (user) {
       try {
         const habitRef = doc(db, `users/${user.uid}/habits`, id);
+        // Toggle lastCompletedDate: if already completed today, clear it; otherwise set to today
         await updateDoc(habitRef, {
-          isCompletedToday: !habit.isCompletedToday
+          lastCompletedDate: habit.isCompletedToday ? null : today
         });
       } catch (error) {
         console.error("Error toggling habit:", error);
       }
     } else {
-      setHabits(prev => prev.map(h => h.id === id ? { ...h, isCompletedToday: !h.isCompletedToday } : h));
+      setHabits(prev => prev.map(h => h.id === id ? { 
+        ...h, 
+        isCompletedToday: !h.isCompletedToday,
+        lastCompletedDate: !h.isCompletedToday ? today : null 
+      } : h));
     }
   };
 
@@ -108,7 +133,7 @@ export default function Dashboard() {
       try {
         await addDoc(collection(db, `users/${user.uid}/habits`), {
           name: newHabit.name,
-          isCompletedToday: false,
+          lastCompletedDate: null,
           createdAt: serverTimestamp(),
         });
       } catch (error) {
@@ -119,6 +144,7 @@ export default function Dashboard() {
         id: Math.random().toString(36).substr(2, 9),
         name: newHabit.name,
         isCompletedToday: false,
+        lastCompletedDate: null,
       };
       setHabits(prev => [...prev, habit]);
     }
@@ -149,20 +175,39 @@ export default function Dashboard() {
         onLogout={logout}
       />
 
-      {/* Account Verification Debug */}
+      {/* Sync Diagnostics */}
       {user && (
-        <div className="flex flex-col md:flex-row justify-between items-center gap-2 mb-6 -mt-8 px-2 transition-all duration-300">
-          <div className="flex items-center gap-2 text-[9px] font-bold opacity-30 uppercase tracking-[0.2em] w-full md:w-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-6 -mt-8 px-2 transition-all duration-300">
+          <div className="flex items-center gap-2 text-[9px] font-bold opacity-30 uppercase tracking-[0.2em] md:w-auto">
             <span className="w-1.5 h-1.5 rounded-full bg-brand-primary" />
-            Active Account: {user.email}
+            Account: {user.email}
           </div>
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${
-            isLoading 
-              ? "bg-amber-500/10 text-amber-500 border-amber-500/20" 
-              : "bg-green-500/10 text-green-500 border-green-500/20"
-          }`}>
-            <div className={`w-1.5 h-1.5 rounded-full ${isLoading ? "bg-amber-500 animate-pulse" : "bg-green-500"}`} />
-            {isLoading ? "Syncing Logic..." : "Cloud Link Secured"}
+          <div className="flex items-center gap-3 w-full md:w-auto justify-start">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest border transition-colors ${
+              isLoading 
+                ? "bg-amber-500/10 text-amber-500 border-amber-500/20" 
+                : isFromCache
+                  ? "bg-red-500/10 text-red-500 border-red-500/20"
+                  : "bg-green-500/10 text-green-500 border-green-500/20"
+            }`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${
+                isLoading 
+                  ? "bg-amber-500 animate-pulse" 
+                  : isFromCache 
+                    ? "bg-red-500" 
+                    : "bg-green-500"
+              }`} />
+              {isLoading ? "Verifying Signal..." : isFromCache ? "Local Mode (Offline)" : "Cloud Link Active"}
+            </div>
+            
+            {isFromCache && !isLoading && (
+              <button 
+                onClick={() => window.location.reload()}
+                className="text-[9px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity underline decoration-brand-primary/30"
+              >
+                Retry Link
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -199,7 +244,7 @@ export default function Dashboard() {
           />
         </div>
 
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 lg:sticky lg:top-8 lg:h-[calc(100vh-14rem)] flex flex-col">
           {isLoading ? (
             <div className="flex flex-col gap-6">
               <div className="h-8 w-40 bg-foreground/5 rounded-lg animate-pulse" />

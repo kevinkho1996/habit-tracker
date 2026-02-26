@@ -38,13 +38,38 @@
   }
 }
 
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--card-border);
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--color-brand-primary);
+  }
+}
+
 .glass-card {
   background: var(--card);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--card-border);
   position: relative;
   overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(168, 85, 247, 0.3);
+  box-shadow: 0 20px 40px -20px rgba(168, 85, 247, 0.15);
 }
 
 .glass-card::before {
