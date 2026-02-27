@@ -16,7 +16,7 @@ const syne = Syne({
 });
 
 export const metadata: Metadata = {
-  title: "Discipline Tracker",
+  title: "Youroutine",
   description: "Track your progress with precision and style.",
 };
 

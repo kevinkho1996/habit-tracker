@@ -17,7 +17,9 @@ import {
   updateDoc, 
   doc, 
   serverTimestamp,
-  orderBy
+  orderBy,
+  arrayUnion,
+  arrayRemove
 } from "firebase/firestore";
 
 interface Habit {
@@ -25,11 +27,9 @@ interface Habit {
   name: string;
   isCompletedToday: boolean;
   lastCompletedDate: string | null;
+  completedDates?: string[];
+  createdAt?: string;
 }
-
-// History would normally come from a database, using empty/mock for now
-const MOCK_HISTORY: number[] = [];
-const MOCK_LABELS: string[] = [];
 
 export default function Dashboard() {
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -68,11 +68,24 @@ export default function Dashboard() {
         const today = new Date().toISOString().split('T')[0];
         const habitsData = snapshot.docs.map(doc => {
           const data = doc.data();
+          const completedDates = data.completedDates || [];
+          if (data.lastCompletedDate && !completedDates.includes(data.lastCompletedDate)) {
+            completedDates.push(data.lastCompletedDate);
+          }
+          let createdAtStr = new Date().toISOString();
+          if (data.createdAt && typeof data.createdAt.toDate === 'function') {
+            createdAtStr = data.createdAt.toDate().toISOString();
+          } else if (data.createdAt) {
+            createdAtStr = new Date(data.createdAt).toISOString();
+          }
+
           return {
             id: doc.id,
             name: data.name,
             lastCompletedDate: data.lastCompletedDate,
-            isCompletedToday: data.lastCompletedDate === today
+            completedDates: completedDates,
+            createdAt: createdAtStr,
+            isCompletedToday: completedDates.includes(today) || data.lastCompletedDate === today
           };
         }) as Habit[];
 
@@ -108,29 +121,78 @@ export default function Dashboard() {
     return Math.round((completed / habits.length) * 100);
   }, [habits]);
 
+  const { chartData, chartLabels } = useMemo(() => {
+    const data: number[] = [];
+    const labels: string[] = [];
+    const today = new Date();
+    
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      
+      const dayLabel = i === 0 
+        ? "Today" 
+        : i === 1 
+          ? "Yesterday" 
+          : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      labels.push(dayLabel);
+      
+      if (!habits || habits.length === 0) {
+        data.push(0);
+        continue;
+      }
+
+      const activeHabits = habits.filter(h => !h.createdAt || h.createdAt.split('T')[0] <= dateStr);
+      
+      if (activeHabits.length === 0) {
+        data.push(0);
+        continue;
+      }
+      
+      const completedCount = activeHabits.filter(h => h.completedDates?.includes(dateStr) || h.lastCompletedDate === dateStr).length;
+      data.push(Math.round((completedCount / activeHabits.length) * 100));
+    }
+    
+    return { chartData: data, chartLabels: labels };
+  }, [habits]);
+
   const toggleHabit = async (id: string) => {
     const habit = habits.find(h => h.id === id);
     if (!habit) return;
 
     const today = new Date().toISOString().split('T')[0];
+    const willComplete = !habit.isCompletedToday;
 
     if (user) {
       try {
         const habitRef = doc(db, `users/${user.uid}/habits`, id);
-        // Toggle lastCompletedDate: if already completed today, clear it; otherwise set to today
         await updateDoc(habitRef, {
-          lastCompletedDate: habit.isCompletedToday ? null : today
+          lastCompletedDate: willComplete ? today : null,
+          completedDates: willComplete ? arrayUnion(today) : arrayRemove(today)
         });
-        trackEvent(habit.isCompletedToday ? 'uncomplete_habit' : 'complete_habit', { habit_id: id });
+        trackEvent(willComplete ? 'complete_habit' : 'uncomplete_habit', { habit_id: id });
       } catch (error) {
         console.error("Error toggling habit:", error);
       }
     } else {
-      setHabits(prev => prev.map(h => h.id === id ? { 
-        ...h, 
-        isCompletedToday: !h.isCompletedToday,
-        lastCompletedDate: !h.isCompletedToday ? today : null 
-      } : h));
+      setHabits(prev => prev.map(h => {
+        if (h.id === id) {
+          const newCompletedDates = new Set(h.completedDates || []);
+          if (willComplete) {
+            newCompletedDates.add(today);
+          } else {
+            newCompletedDates.delete(today);
+          }
+          return { 
+            ...h, 
+            isCompletedToday: willComplete,
+            lastCompletedDate: willComplete ? today : null,
+            completedDates: Array.from(newCompletedDates)
+          };
+        }
+        return h;
+      }));
     }
   };
 
@@ -140,6 +202,7 @@ export default function Dashboard() {
         await addDoc(collection(db, `users/${user.uid}/habits`), {
           name: newHabit.name,
           lastCompletedDate: null,
+          completedDates: [],
           createdAt: serverTimestamp(),
         });
         trackEvent('add_habit', { habit_name: newHabit.name });
@@ -152,6 +215,8 @@ export default function Dashboard() {
         name: newHabit.name,
         isCompletedToday: false,
         lastCompletedDate: null,
+        completedDates: [],
+        createdAt: new Date().toISOString()
       };
       setHabits(prev => [...prev, habit]);
     }
@@ -170,9 +235,6 @@ export default function Dashboard() {
     }
   };
 
-  const chartData = [...MOCK_HISTORY, successRate];
-  const chartLabels = [...MOCK_LABELS, "Today"];
-
   return (
     <main className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto pb-24">
       <Header 
@@ -189,10 +251,6 @@ export default function Dashboard() {
       {/* Sync Diagnostics */}
       {user && (
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-6 -mt-8 px-2 transition-all duration-300">
-          <div className="flex items-center gap-2 text-[9px] font-bold opacity-30 uppercase tracking-[0.2em] md:w-auto">
-            <span className="w-1.5 h-1.5 rounded-full bg-brand-primary" />
-            Account: {user.email}
-          </div>
           {/* <div className="flex items-center gap-3 w-full md:w-auto justify-start">
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest border transition-colors ${
               isLoading 
@@ -228,6 +286,19 @@ export default function Dashboard() {
         <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-500 text-xs font-bold uppercase tracking-tight">
           <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
           {error}
+        </div>
+      )}
+
+      {/* Offline/Local Mode Warning */}
+      {!user && !authLoading && (
+        <div className="mb-8 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex md:items-center flex-col md:flex-row gap-3 md:gap-4 text-amber-500 text-xs font-bold tracking-tight shadow-lg shadow-amber-500/5">
+          <div className="flex items-center gap-3 w-full md:w-auto shrink-0 uppercase">
+            <div className="w-2 h-2 rounded-full bg-amber-500 animate-[pulse_2s_ease-in-out_infinite]" />
+            Local Mode Active
+          </div>
+          <p className="opacity-80 leading-relaxed font-medium md:border-l md:border-amber-500/20 md:pl-4">
+            Your progress is currently saved locally. Sign in to sync your routines to the cloud and prevent data loss.
+          </p>
         </div>
       )}
 

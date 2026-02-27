@@ -20,10 +20,10 @@ export function Header({ date, onAddClick, user, onSignIn, onLogout }: HeaderPro
           </div>
           <div className="flex flex-col">
             <h1 className="font-display text-2xl md:text-4xl font-bold tracking-tight leading-none group-data-[mobile=true]:pr-14">
-              Discipline Tracker
+              Youroutine
             </h1>
             <p className="text-[10px] md:text-sm font-medium opacity-40 mt-1.5 ml-0.5">
-              Protocol: Performance Monitoring
+              Track your progress with precision and style.
             </p>
           </div>
         </div>

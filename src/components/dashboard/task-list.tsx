@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trash2 } from "lucide-react";
+import { X } from "lucide-react";
 
 interface Habit {
   id: string;
@@ -37,23 +37,23 @@ export function TaskList({ habits, onToggle, onDelete }: TaskListProps) {
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                className="group flex items-center gap-3"
+                className={`group flex items-center justify-between p-4 md:p-5 rounded-2xl border-2 transition-all duration-300 shadow-sm ${
+                  habit.isCompletedToday 
+                    ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" 
+                    : "glass-card border-transparent hover:border-brand-primary/20 hover:shadow-md"
+                }`}
               >
                 <button
                   onClick={() => onToggle(habit.id)}
-                  className={`flex-1 flex items-center justify-between p-5 rounded-2xl border-2 transition-all duration-300 active:scale-[0.98] cursor-pointer shadow-sm ${
-                    habit.isCompletedToday 
-                      ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" 
-                      : "glass-card border-transparent hover:border-brand-primary/20 hover:shadow-md"
-                  }`}
+                  className="flex-1 flex items-center justify-between text-left pr-4 cursor-pointer active:scale-[0.98] transition-transform"
                 >
                   <span className={`text-base font-semibold tracking-tight transition-opacity ${habit.isCompletedToday ? "opacity-100" : "opacity-80"}`}>
                     {habit.name}
                   </span>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-500 scale-100 ${
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-500 scale-100 shrink-0 ${
                     habit.isCompletedToday 
                       ? "bg-brand-primary border-brand-primary shadow-lg shadow-brand-primary/40 rotate-0" 
-                      : "border-foreground/10 rotate-90"
+                      : "border-foreground/20 rotate-90"
                   }`}>
                     {habit.isCompletedToday && (
                       <motion.div 
@@ -65,12 +65,13 @@ export function TaskList({ habits, onToggle, onDelete }: TaskListProps) {
                   </div>
                 </button>
                 
+                {/* Always visible Trash Button (styled delicately to not be distracting) */}
                 <button
                   onClick={() => onDelete(habit.id)}
-                  className="p-4 rounded-2xl bg-red-500/5 text-red-500/40 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-red-500 hover:text-white hover:shadow-lg hover:shadow-red-500/20 shrink-0 cursor-pointer"
+                  className="p-2 md:p-3 rounded-xl bg-red-500/5 text-red-500/40 opacity-70 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-red-500 hover:text-white hover:shadow-lg hover:shadow-red-500/20 shrink-0 cursor-pointer"
                   aria-label={`Delete ${habit.name}`}
                 >
-                  <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+                  <X className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
               </motion.div>
             ))}
