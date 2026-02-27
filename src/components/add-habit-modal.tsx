@@ -26,19 +26,21 @@ export function AddHabitModal({ isOpen, onClose, onAdd }: AddHabitModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+        >
+          <div
             onClick={onClose}
             className="absolute inset-0 bg-background/80 backdrop-blur-sm"
           />
           
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 40 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 40 }}
+            initial={{ scale: 0.9, y: 40 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 40 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="glass-card w-[92%] sm:w-full max-w-md p-6 md:p-10 rounded-[2.5rem] relative z-10 shadow-2xl border-t border-l border-white/20"
           >
@@ -92,7 +94,7 @@ export function AddHabitModal({ isOpen, onClose, onAdd }: AddHabitModalProps) {
               </button>
             </form>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
